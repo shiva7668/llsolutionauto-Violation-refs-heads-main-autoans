@@ -1,1 +1,32 @@
-OK
+// ==UserScript==
+// @name         Auto Confirm Button Click (8s show + 10s auto click)
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Show confirm button after 8 sec and auto click at 10 sec
+// @match        *://sarathi.parivahan.gov.in/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    function waitForButton() {
+        const btn = document.getElementById("Confirm");
+        if (!btn) {
+            // Retry until the button exists
+            setTimeout(waitForButton, 100);
+            return;
+        }
+
+        // Hide button initially
+        btn.style.display = "none";
+
+        // Show after 8 seconds
+        setTimeout(() => {
+            btn.style.display = "none";
+            console.log("Confirm button shown at 0 seconds");
+        }, 500);
+
+        // Auto click after 0 seconds
+
+})();
