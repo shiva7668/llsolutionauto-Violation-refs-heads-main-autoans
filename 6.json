@@ -1,1 +1,39 @@
-OK
+// ==UserScript==
+// @name         Sarathi Auto Confirm Fix
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Automatically click confirm button on Sarathi portal
+// @author       You
+// @match        https://sarathi.parivahan.gov.in/sarathiservice/*
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // Run after slight delay to ensure page loads
+    setTimeout(() => {
+        try {
+
+            // If page uses an iframe, update this accordingly:
+            const iframeDoc = document;
+
+            const confirmBtn = iframeDoc.getElementById("confirmbut");
+            if (!confirmBtn) {
+                console.log("[Userscript] Confirm button not found.");
+                return;
+            }
+
+            // Enable + click
+            confirmBtn.disabled = false;
+            confirmBtn.removeAttribute("disabled");
+            confirmBtn.click();
+
+            console.log("[Userscript] Confirm button clicked automatically.");
+
+        } catch (err) {
+            console.error("[Userscript ERROR]", err);
+        }
+
+    }, 8000); // 4 sec delay
+})();
