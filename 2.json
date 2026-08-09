@@ -1,1 +1,210 @@
-OK
+// ==UserScript==
+// @name         Auto Answer Ultra Fast GJ 1 (Click FIXED)
+// @namespace    http://tampermonkey.net/
+// @version      7.0
+// @description  ✅ AUTO CLICK ON CORRECT ANSWER - CLICK FIXED
+// @match        *://*/*
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    const JSON_URL = "https://raw.githubusercontent.com/shiva7668/llsolutionauto-Violation-refs-heads-main-autoans/main/GJ53.json";
+
+    const ANSWER_MAP = new Map();
+    let lastKey = "";
+    let dbLoaded = false;
+
+    // ---------- LOAD DB ----------
+    console.log("🚀 Auto Answer Starting...");
+
+    fetch(JSON_URL)
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.text(); // RAW text first
+        })
+        .then(text => {
+            const data = JSON.parse(text);
+            data.forEach((item, index) => {
+                try {
+                    const key = extractKeyFromHTML(item.q);
+                    const choice = extractChoice(item.a);
+                    if (key && choice) {
+                        ANSWER_MAP.set(key, choice);
+                    }
+                } catch(e) {
+                    // Skip bad items
+                }
+            });
+            dbLoaded = true;
+            console.log("✅ DB LOADED:", ANSWER_MAP.size, "questions");
+        })
+        .catch(err => {
+            console.error("❌ JSON ERROR:", err);
+        });
+
+    // ---------- EXTRACTORS ----------
+    function extractKeyFromHTML(html) {
+        try {
+            let m = html.match(/base64,([^"]+)/);
+            return m ? m[1].substring(0, 400) : null;
+        } catch(e) { return null; }
+    }
+
+    function extractKeyFromPage(src) {
+        if (!src) return null;
+        return src.replace(/^data:image\/(png|jpg|jpeg);base64,/, "").substring(0, 400);
+    }
+
+    function extractChoice(html) {
+        // choice1, choice2, choice3, choice4
+        let m = html.match(/choice[0-4]/i);
+        return m ? m[0] : null;
+    }
+
+    // ---------- FIND QUESTION IMAGE (IMPROVED) ----------
+    function getQImg() {
+        // Multiple selectors for different sites
+        return document.querySelector([
+            "img[name='qframe']",
+            ".question img",
+            ".q-img img",
+            "img[src*='question']",
+            ".question-image img",
+            "#question img"
+        ].join(','));
+    }
+
+    // ---------- AUTO CLICK FUNCTION (SUPER FIXED) ----------
+    function autoClick() {
+        if (!dbLoaded || !ANSWER_MAP.size) {
+            console.log("⏳ DB loading...");
+            return;
+        }
+
+        const qImg = getQImg();
+        if (!qImg?.src) {
+            // console.log("❌ No question image");
+            return;
+        }
+
+        const key = extractKeyFromPage(qImg.src);
+        if (!key || key === lastKey) return;
+
+        console.log("🔍 Key:", key.substring(0, 30) + "...");
+
+        const choiceId = ANSWER_MAP.get(key);
+        if (!choiceId) {
+            console.log("❓ Question NOT in DB");
+            return;
+        }
+
+        // 🔥 CLICK FIX - Multiple methods
+        const clickTarget = findAndClick(choiceId);
+        if (clickTarget) {
+            lastKey = key;
+            console.log("✅ AUTO CLICKED", choiceId, "🎯");
+        } else {
+            console.log("❌", choiceId, "NOT FOUND - Page structure changed");
+        }
+    }
+
+    // ---------- CLICK DETECTOR (ULTIMATE FIX) ----------
+    function findAndClick(choiceId) {
+        // Method 1: Direct ID
+        let target = document.getElementById(choiceId);
+        if (target) {
+            simulateClick(target);
+            return true;
+        }
+
+        // Method 2: By label/input name
+        target = document.querySelector(`input[name="${choiceId}"], label[for="${choiceId}"]`);
+        if (target) {
+            simulateClick(target);
+            return true;
+        }
+
+        // Method 3: Radio/checkbox with value
+        target = document.querySelector(`input[type="radio"][value="${choiceId}"], input[type="checkbox"][value="${choiceId}"]`);
+        if (target) {
+            simulateClick(target);
+            return true;
+        }
+
+        // Method 4: By class name
+        target = document.querySelector(`.${choiceId}`);
+        if (target) {
+            simulateClick(target);
+            return true;
+        }
+
+        // Method 5: Common option selectors
+        const options = document.querySelectorAll('input[type="radio"], input[type="checkbox"], .option, .answer');
+        options.forEach((opt, i) => {
+            if (opt.id?.includes('choice') || opt.name?.includes('choice') || opt.value === choiceId) {
+                simulateClick(opt);
+                console.log("🔧 Clicked option", i+1);
+                return true;
+            }
+        });
+
+        return false;
+    }
+
+    // ---------- REAL CLICK SIMULATION ----------
+    function simulateClick(element) {
+        element.focus();
+        element.click();
+
+        // Force events
+        ['click', 'change', 'input'].forEach(eventType => {
+            element.dispatchEvent(new MouseEvent(eventType, {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }));
+        });
+    }
+
+    // ---------- OBSERVER (OPTIMIZED) ----------
+    function debounce(fn, ms) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn(...args), ms);
+        };
+    }
+
+    const observer = new MutationObserver(debounce(autoClick, 100));
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    function init() {
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['src', 'class']
+        });
+
+        // Continuous checking
+        setInterval(autoClick, 800);
+        setTimeout(autoClick, 500);
+
+        console.log("🎯 AUTO CLICK READY - v7.0");
+    }
+
+    // ---------- DEBUG ----------
+    window.DEBUG_AUTO = {
+        dbSize: () => ANSWER_MAP.size,
+        testClick: (id) => findAndClick(id),
+        runNow: autoClick
+    };
+})();
