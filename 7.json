@@ -1,1 +1,73 @@
-OK
+// ==UserScript==
+// @name         Sarathi Error Fix
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @match        https://sarathi.parivahan.gov.in/*
+// @run-at       document-start
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // performance.navigation patch
+    try {
+        if (window.performance) {
+            Object.defineProperty(window.performance, 'navigation', {
+                configurable: true,
+                get() {
+                    return {
+                        type: 0,
+                        redirectCount: 0
+                    };
+                }
+            });
+        }
+    } catch (e) {}
+
+    // Ignore known errors
+    window.addEventListener('error', function (e) {
+        const msg = String(e.message || '');
+
+        if (
+            msg.includes('Failed to fetch') ||
+            msg.includes('missing script')
+        ) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        }
+    }, true);
+
+    // Ignore promise rejections
+    window.addEventListener('unhandledrejection', function (e) {
+        const msg = String(e.reason || '');
+
+        if (
+            msg.includes('Failed to fetch') ||
+            msg.includes('missing script')
+        ) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
+    });
+
+    // Safe fetch
+    if (window.fetch) {
+        const originalFetch = window.fetch;
+
+        window.fetch = async function (...args) {
+            try {
+                return await originalFetch.apply(this, args);
+            } catch (err) {
+                console.warn('Fetch failed:', err);
+
+                return new Response('{}', {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+            }
+        };
+    }
+})();
