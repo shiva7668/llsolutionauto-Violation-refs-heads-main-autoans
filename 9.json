@@ -1,1 +1,136 @@
-OK
+// ==UserScript==
+// @name         Universal Captcha Preview Box & Double-Click Refresh
+// @namespace    http://tampermonkey.net/
+// @version      5.0
+// @description  Shows a beautiful zoomed preview box for captcha on ALL websites with double-click refresh
+// @author       AI Assistant
+// @match        *://*/*
+// @grant        none
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+'use strict';
+
+// सटीक रिफ्रेश लॉजिक (डबल क्लिक करने पर असली बटन दबाना या लिंक बदलना)
+function triggerCaptchaRefresh(img, doc) {
+let refreshed = false;
+let currentUrl = window.location.href;
+// (A) e-District UP और संबंधित साइटों के लिए
+if (currentUrl.includes("up.gov.in") || currentUrl.includes("edistrict")) {
+    let edistBtn = doc.querySelector("a[onclick*='refresh'], input[type='button'][value*='Refresh'], .refresh-icon, img[src*='refresh']");
+    if (edistBtn) { edistBtn.click(); refreshed = true; }
+}
+
+// (B) PM Kisan पोर्टल के लिए
+if (currentUrl.includes("pmkisan.gov.in")) {
+    let pmBtn = doc.querySelector("#partid, [onclick*='Captcha'], [onclick*='captcha']");
+    if (pmBtn) { pmBtn.click(); refreshed = true; }
+}
+
+// (C) Voter ID Portal (ECI) के लिए
+if (currentUrl.includes("voters.eci.gov.in") || currentUrl.includes("nvsp")) {
+    let voterBtn = doc.querySelector("span.fa-refresh, button.refreshbtn, .voter-refresh, img[src*='refresh'], a[id*='refresh']");
+    if (voterBtn) { voterBtn.click(); refreshed = true; }
+}
+
+// (D) सामान्य वेबसाइटों पर रिफ्रेश बटन/आइकन ढूंढना
+if (!refreshed) {
+    let generalBtn = doc.querySelector("[id*='refresh'], [class*='refresh'], [src*='refresh'], [title*='refresh'], [id*='reload'], [class*='reload'], [title*='Reload']");
+    if (generalBtn && generalBtn !== img) {
+        generalBtn.click();
+        refreshed = true;
+    }
+}
+
+// (E) बैकअप रास्ता: अगर कोई बटन न मिले, तो इमेज का लिंक बदलें
+if (!refreshed) {
+    let currentSrc = img.src;
+    if (currentSrc.indexOf('?') > -1) {
+        img.src = currentSrc.split('?')[0] + '?t=' + new Date().getTime();
+    } else {
+        img.src = currentSrc + '?t=' + new Date().getTime();
+    }
+}
+
+}
+
+function createUniversalPreview(doc) {
+// लगभग सभी वेबसाइटों के सामान्य और विशिष्ट कैप्चा इमेज सेलेक्टर्स
+const selectors = [
+"img[id*='captcha']", "img[id*='Captcha']", "img[id*='ccaptcha']",
+"img[src*='captcha']", "img[src*='Captcha']", "img[src*='getImg']",
+"img[src*='CaptchaImage']", "img[src*='validate']",
+"#captcha-img", "#captcha_img", ".captcha-image", "#imgValid"
+];
+selectors.forEach(selector => {
+    let originalImages = doc.querySelectorAll(selector);
+    originalImages.forEach(img => {
+        // अगर इस इमेज का प्रीव्यू बॉक्स पहले से नहीं बना है और यह खुद कोई क्लोन नहीं है
+        if (!img.dataset.hasPreviewBox && !img.id.includes("cloned-preview")) {
+
+            // 1. एक सुंदर डैश-बॉर्डर वाला बॉक्स (कंटेनर) बनाएं
+            let mainContainer = doc.createElement("div");
+            mainContainer.id = "universal-captcha-container";
+            mainContainer.style = "margin: 15px 0px; padding: 10px; border: 1px dashed #1CA6EF; border-radius: 10px; background: #f9f9f9; display: inline-flex; flex-direction: column; align-items: center; gap: 6px; font-family: Arial, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,0.05);";
+
+            // 2. बॉक्स के ऊपर का छोटा लेबल टेक्स्ट
+            let label = doc.createElement("div");
+            label.innerText = "CAPTCHA PREVIEW (ZOOMED):";
+            label.style = "font-size: 10px; color: #666; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;";
+            mainContainer.appendChild(label);
+
+            // 3. असली कैप्चा की हूबहू कॉपी (Clone) बनाकर उसे बड़ा करना
+            let clonedImg = img.cloneNode(true);
+            clonedImg.id = "cloned-preview-" + Math.random().toString(36).substr(2, 9);
+
+            // स्टाइलिंग: कैप्चा को 1.8 गुना ज़ूम और सुंदर नारंगी-लाल बॉर्डर देना
+            clonedImg.style = "transform: scale(1.8); margin: 15px 12px; display: inline-block; box-shadow: 0 3px 8px rgba(0,0,0,0.2); border: 3px solid #FF5722; border-radius: 6px; cursor: pointer; transition: transform 0.2s ease;";
+            clonedImg.title = "डबल क्लिक करके कैप्चा बदलें!";
+
+            // 4. बड़े प्रीव्यू इमेज पर डबल क्लिक इवेंट जोड़ना
+            clonedImg.addEventListener('dblclick', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Universal Preview Box: Double clicked.");
+                triggerCaptchaRefresh(img, doc);
+            });
+
+            mainContainer.appendChild(clonedImg);
+
+            // 5. इस सुंदर बॉक्स को असली कैप्चa इमेज के ठीक नीचे स्क्रीन पर जोड़ना
+            img.parentNode.insertBefore(mainContainer, img.nextSibling);
+
+            // मूल इमेज को छुपाना नहीं है, पर मार्क कर देना है ताकि लूप बार-बार न चले
+            img.dataset.hasPreviewBox = "true";
+
+            // 6. सिंक इंटरवल: अगर असली कैप्चा पीछे से बदलता है, तो प्रीव्यू भी तुरंत बदल जाए
+            setInterval(() => {
+                if (img && clonedImg && clonedImg.src !== img.src) {
+                    clonedImg.src = img.src;
+                }
+            }, 400);
+
+            console.log("Universal Preview Box: Box applied successfully!");
+        }
+    });
+});
+
+}
+
+// नए लोड होने वाले कैप्चा एलिमेंट्स पर लगातार नज़र रखने के लिए टाइमर
+setInterval(() => {
+createUniversalPreview(document);
+let iframes = document.getElementsByTagName('iframe');
+for (let i = 0; i < iframes.length; i++) {
+    try {
+        let iframeDoc = iframes[i].contentDocument || iframes[i].contentWindow.document;
+        createUniversalPreview(iframeDoc);
+    } catch (e) {
+        // सुरक्षा ब्लॉकिंग को बायपास करें
+    }
+}
+
+}, 800);
+
+})();
